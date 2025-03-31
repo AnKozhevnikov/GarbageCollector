@@ -7,7 +7,19 @@ add_subdirectory(tests)
 
 file(GLOB_RECURSE SOURCES "src/*.c")
 
-add_library(gc ${SOURCES})
+if(APPLE)
+    file(GLOB_RECURSE PLATFORM_SOURCES "platform/apple/*.c")
+elseif(UNIX AND NOT APPLE)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        file(GLOB_RECURSE PLATFORM_SOURCES "platform/linux/*.c")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD" OR CMAKE_SYSTEM_NAME STREQUAL "OpenBSD" OR CMAKE_SYSTEM_NAME STREQUAL "NetBSD")
+        file(GLOB_RECURSE PLATFORM_SOURCES "platform/bsd/*.c")
+    endif()
+endif()
+
+list(APPEND SOURCES ${PLATFORM_SOURCES})
+
+add_library(gc STATIC ${SOURCES})
 set_target_properties(gc PROPERTIES LINKER_LANGUAGE C)
 
 add_executable(demo demo.c)
