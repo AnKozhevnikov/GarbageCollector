@@ -1,12 +1,13 @@
 #ifndef HASHMAP_H
 #define HASHMAP_H
 
-#include <stddef.h>
 #include <pthread.h>
+#include <stddef.h>
 
 struct HashMap
 {
     unsigned size;
+    unsigned deleted_cnt;
     unsigned capacity;
     double max_load_factor;
     unsigned key_size;
@@ -31,6 +32,7 @@ struct HashMap hashmap_create(unsigned key_size, unsigned value_size, unsigned (
 void hashmap_destruct(struct HashMap *map);
 int hashmap_contains(const struct HashMap *map, const void *key);
 void hashmap_rebuild(struct HashMap *map, unsigned new_capacity);
+void hashmap_insert_nolock(struct HashMap *map, const void *key, const void *value);
 void hashmap_insert(struct HashMap *map, const void *key, const void *value);
 void hashmap_erase(struct HashMap *map, const void *key);
 struct Iterator hashmap_find(const struct HashMap *map, const void *key);

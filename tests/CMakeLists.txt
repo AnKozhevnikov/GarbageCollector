@@ -14,7 +14,10 @@ enable_testing()
 include(GoogleTest)
 
 function(test_case NAME)
-  add_executable("${NAME}" "src/${NAME}.c")
-  target_link_libraries("${NAME}" PRIVATE gtest_main database)
+  add_executable("${NAME}" "src/${NAME}.cpp")
+  target_link_libraries("${NAME}" PRIVATE gtest_main gc)
   gtest_discover_tests("${NAME}" WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
 endfunction()
+
+test_case(hashmap_tests)
+test_case(gc_tests)

@@ -7,6 +7,7 @@ struct HashMap hashmap_create(unsigned key_size, unsigned value_size, unsigned (
 {
     struct HashMap map;
     map.size = 0;
+    map.deleted_cnt = 0;
     map.capacity = 8;
     map.max_load_factor = 0.75;
     map.key_size = key_size;
@@ -49,8 +50,6 @@ int hashmap_contains(const struct HashMap *map, const void *key)
 
 void hashmap_rebuild(struct HashMap *map, unsigned new_capacity)
 {
-    pthread_rwlock_wrlock(&map->lock);
-
     void *old_values = map->values;
     int *old_used = map->used;
     int *old_deleted = map->deleted;
@@ -61,6 +60,7 @@ void hashmap_rebuild(struct HashMap *map, unsigned new_capacity)
     map->used = calloc(map->capacity, sizeof(int));
     map->deleted = calloc(map->capacity, sizeof(int));
     map->size = 0;
+    map->deleted_cnt = 0;
 
     for (unsigned i = 0; i < old_capacity; i++)
     {
@@ -68,21 +68,40 @@ void hashmap_rebuild(struct HashMap *map, unsigned new_capacity)
         {
             void *key = old_values + i * (map->key_size + map->value_size);
             void *value = old_values + i * (map->key_size + map->value_size) + map->key_size;
-            hashmap_insert(map, key, value);
+            hashmap_insert_nolock(map, key, value);
         }
     }
 
     free(old_values);
     free(old_used);
+    free(old_deleted);
+}
 
-    pthread_rwlock_unlock(&map->lock);
+void hashmap_insert_nolock(struct HashMap *map, const void *key, const void *value)
+{
+    if (map->size + map->deleted_cnt >= map->max_load_factor * map->capacity)
+    {
+        hashmap_rebuild(map, 2 * map->capacity);
+    }
+
+    unsigned hash = map->hashfunc(key);
+    unsigned i = hash % map->capacity;
+    while (map->used[i])
+    {
+        i = (i + 1) % map->capacity;
+    }
+
+    memcpy(map->values + i * (map->key_size + map->value_size), key, map->key_size);
+    memcpy(map->values + i * (map->key_size + map->value_size) + map->key_size, value, map->value_size);
+    map->used[i] = 1;
+    map->size++;
 }
 
 void hashmap_insert(struct HashMap *map, const void *key, const void *value)
 {
     pthread_rwlock_wrlock(&map->lock);
 
-    if (map->size >= map->max_load_factor * map->capacity)
+    if (map->size + map->deleted_cnt >= map->max_load_factor * map->capacity)
     {
         hashmap_rebuild(map, 2 * map->capacity);
     }
@@ -114,6 +133,7 @@ void hashmap_erase(struct HashMap *map, const void *key)
         {
             map->deleted[i] = 1;
             map->size--;
+            map->deleted_cnt++;
             break;
         }
         i = (i + 1) % map->capacity;

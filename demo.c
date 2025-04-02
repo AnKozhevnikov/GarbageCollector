@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 #include "gc.h"
+#include <assert.h>
 
 struct foo
 {

@@ -8,7 +8,7 @@
 
 unsigned hash_for_pointer(const void *value)
 {
-    return (unsigned)(uintptr_t)value;
+    return (unsigned)*(uintptr_t *)value;
 }
 
 unsigned hash_for_thread(pthread_t value)
@@ -67,7 +67,7 @@ void *gc_malloc(size_t size)
     alloc->active = 1;
     hashmap_insert(&gc->allocations, &alloc->ptr, &alloc);
 
-    if (atomic_fetch_add(&gc->allocation_cnt, 1) > gc->allocation_threshold)
+    if (atomic_fetch_add(&gc->allocation_cnt, 1) > gc->allocation_threshold && !gc->paused)
     {
         collect_garbage();
         atomic_store(&gc->allocation_cnt, 0);
@@ -84,7 +84,7 @@ void *gc_calloc(size_t nmemb, size_t size)
     alloc->active = 1;
     hashmap_insert(&gc->allocations, &alloc->ptr, &alloc);
 
-    if (atomic_fetch_add(&gc->allocation_cnt, 1) > gc->allocation_threshold)
+    if (atomic_fetch_add(&gc->allocation_cnt, 1) > gc->allocation_threshold && !gc->paused)
     {
         collect_garbage();
         atomic_store(&gc->allocation_cnt, 0);
@@ -102,7 +102,7 @@ void *gc_realloc(void *ptr, size_t size)
     alloc->size = size;
     hashmap_insert(&gc->allocations, &alloc->ptr, &alloc);
 
-    if (atomic_fetch_add(&gc->allocation_cnt, 1) > gc->allocation_threshold)
+    if (atomic_fetch_add(&gc->allocation_cnt, 1) > gc->allocation_threshold && !gc->paused)
     {
         collect_garbage();
         atomic_store(&gc->allocation_cnt, 0);
@@ -320,4 +320,14 @@ void gc_unregister_thread()
     hashmap_erase(&gc->threads, &self);
 
     signal(SIGUSR1, SIG_DFL);
+}
+
+void gc_pause()
+{
+    gc->paused = 1;
+}
+
+void gc_resume()
+{
+    gc->paused = 0;
 }

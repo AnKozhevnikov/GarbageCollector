@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.14.0)
 project(garbage_collcetor VERSION 0.1.0 LANGUAGES C)
 
+set(CMAKE_C_STANDARD 11)
+
 include_directories(include src)
 
 add_subdirectory(tests)
@@ -20,6 +22,7 @@ endif()
 list(APPEND SOURCES ${PLATFORM_SOURCES})
 
 add_library(gc STATIC ${SOURCES})
+target_compile_options(gc PRIVATE -std=c11 -D_GNU_SOURCE)
 set_target_properties(gc PROPERTIES LINKER_LANGUAGE C)
 
 add_executable(demo demo.c)
