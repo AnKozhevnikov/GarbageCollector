@@ -12,7 +12,7 @@
 #include "memory_access.h"
 
 unsigned hash_for_pointer(const void *value);
-unsigned hash_for_thread(pthread_t value);
+unsigned hash_for_thread(const void *value);
 
 struct Allocation
 {

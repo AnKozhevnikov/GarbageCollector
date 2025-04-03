@@ -11,9 +11,9 @@ unsigned hash_for_pointer(const void *value)
     return (unsigned)*(uintptr_t *)value;
 }
 
-unsigned hash_for_thread(pthread_t value)
+unsigned hash_for_thread(const void *value)
 {
-    return (unsigned)value;
+    return (unsigned)(pthread_t *)value;
 }
 
 void gc_activate(void *ptr)
@@ -34,7 +34,7 @@ void gc_create()
 {
     gc = malloc(sizeof(struct GarbageCollector));
     gc->allocations = hashmap_create(sizeof(void *), sizeof(void *), hash_for_pointer);
-    gc->threads = hashmap_create(sizeof(pthread_t), 0, hash_for_pointer);
+    gc->threads = hashmap_create(sizeof(pthread_t), 0, hash_for_thread);
     gc->paused = 0;
     gc->bottom = get_stack_base();
     gc->allocation_threshold = 1000;

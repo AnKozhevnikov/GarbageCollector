@@ -15,7 +15,7 @@ struct foo *bssptr;
 
 int main(int argc, char *argv[])
 {
-    /*gc_create();
+    gc_create();
     struct foo *p1 = gc_malloc(sizeof(struct foo));
     struct foo *p2 = gc_malloc(sizeof(struct foo));
     struct foo *p3 = gc_malloc(sizeof(struct foo));
@@ -29,15 +29,7 @@ int main(int argc, char *argv[])
     p4 = 0;
     p5 = 0;
     collect_garbage();
-    gc_destruct();*/
-
-    gc_create();
-
-    for (int i = 0; i<1000; ++i) {
-        int sz = rand() % 1000000;
-        void *ptr = gc_malloc(sz);
-    }
-
     gc_destruct();
+
     return 0;
 }

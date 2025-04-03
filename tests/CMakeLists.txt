@@ -4,7 +4,7 @@ project(tests CXX)
 include(FetchContent)
 FetchContent_Declare(
   googletest
-  URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+  URL https://github.com/google/googletest/archive/refs/heads/main.zip
 )
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
@@ -16,6 +16,8 @@ include(GoogleTest)
 function(test_case NAME)
   add_executable("${NAME}" "src/${NAME}.cpp")
   target_link_libraries("${NAME}" PRIVATE gtest_main gc)
+  target_compile_options("${NAME}" PRIVATE -fprofile-arcs -ftest-coverage -g -O0)
+  target_link_options("${NAME}" PRIVATE -fprofile-arcs -ftest-coverage)
   gtest_discover_tests("${NAME}" WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
 endfunction()
 
