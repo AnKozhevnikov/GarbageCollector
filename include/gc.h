@@ -34,6 +34,8 @@ struct GarbageCollector
     atomic_int allocation_cnt;
 
     unsigned allocation_threshold;
+
+    pthread_mutex_t collect_garbage_mutex;
 };
 
 void gc_activate(void *ptr);

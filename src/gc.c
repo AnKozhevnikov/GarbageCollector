@@ -40,6 +40,7 @@ void gc_create()
     gc->allocation_threshold = 1000;
     gc->threads_to_scan = 0;
     gc->allocation_cnt = 0;
+    gc->collect_garbage_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
 
     gc_register_thread();
 }
@@ -55,7 +56,6 @@ void gc_destruct()
         it = hashmap_next(it);
     }
     hashmap_destruct(&gc->allocations);
-
     hashmap_destruct(&gc->threads);
 }
 
@@ -95,6 +95,10 @@ void *gc_calloc(size_t nmemb, size_t size)
 
 void *gc_realloc(void *ptr, size_t size)
 {
+    if (ptr == NULL)
+    {
+        return gc_malloc(size);
+    }
     struct Iterator it = hashmap_find(&gc->allocations, &ptr);
     struct Allocation *alloc = *(struct Allocation **)it.value;
     hashmap_erase(&gc->allocations, &ptr);
@@ -244,6 +248,8 @@ void sweep()
 
 void collect_garbage()
 {
+    pthread_mutex_lock(&gc->collect_garbage_mutex);
+
     struct Iterator it = hashmap_begin(&gc->allocations);
     while (hashmap_not_end(it))
     {
@@ -283,6 +289,8 @@ void collect_garbage()
     pthread_mutex_unlock(&gc_mutex);
 
     sweep();
+
+    pthread_mutex_unlock(&gc->collect_garbage_mutex);
 }
 
 void gc_signal_handler(int signum)
