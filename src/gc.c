@@ -2,7 +2,7 @@
 #include "global.h"
 #include <stdint.h>
 #include <stdlib.h>
-#include <ucontext.h>
+#include <setjmp.h>
 #include <pthread.h>
 #include <signal.h>
 
@@ -153,8 +153,8 @@ pthread_cond_t gc_cond = PTHREAD_COND_INITIALIZER;
 
 void mark_stack()
 {
-    ucontext_t context;
-    getcontext(&context);
+    jmp_buf buf;
+    int ret = setjmp(buf);
 
     void *top = get_stack_top();
     if (top < gc->bottom)
