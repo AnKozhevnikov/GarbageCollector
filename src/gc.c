@@ -197,8 +197,9 @@ void mark_stack()
 
 void mark_sections()
 {
-    void *top = (void *)__data_start;
-    for (void *i = top; i < (void *)_edata; i += 8)
+    void *top = get_data_start();
+    void *bottom = get_data_end();
+    for (void *i = top; i < bottom; i += 8)
     {
         void *ptr = *(void **)i;
         if (hashmap_contains(&gc->allocations, &ptr))
@@ -213,8 +214,9 @@ void mark_sections()
         }
     }
 
-    top = (void *)__bss_start;
-    for (void *i = top; i < (void *)_end; i += 8)
+    top = get_bss_start();
+    bottom = get_bss_end();
+    for (void *i = top; i < bottom; i += 8)
     {
         void *ptr = *(void **)i;
         if (hashmap_contains(&gc->allocations, &ptr))

@@ -47,3 +47,28 @@ void *get_stack_top()
 #endif
     return sp;
 }
+
+extern char __bss_start[];
+extern char _end[];
+extern char __data_start[];
+extern char _edata[];
+
+void *get_bss_start()
+{
+    return (void *)__bss_start;
+}
+
+void *get_bss_end()
+{
+    return (void *)_end;
+}
+
+void *get_data_start()
+{
+    return (void *)__data_start;
+}
+
+void *get_data_end()
+{
+    return (void *)_edata;
+}

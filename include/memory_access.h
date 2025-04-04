@@ -3,12 +3,12 @@
 
 #include <stdio.h>
 
-extern char __bss_start[];
-extern char _end[];
-extern char __data_start[];
-extern char _edata[];
-
 void *get_stack_base();
 void *get_stack_top();
+
+void *get_bss_start();
+void *get_bss_end();
+void *get_data_start();
+void *get_data_end();
 
 #endif // MEMORY_ACCESS_H
