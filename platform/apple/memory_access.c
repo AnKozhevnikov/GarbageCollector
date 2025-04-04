@@ -16,13 +16,13 @@ void *get_stack_top()
 {
     void *sp;
 #if defined(__x86_64__) || defined(__amd64__)
-    __asm__("movq %%rsp, %0" : "=r"(sp));
+    __asm__ __volatile__("movq %%rsp, %0" : "=r"(sp));
 #elif defined(__i386__)
-    __asm__("movl %%esp, %0" : "=r"(sp));
+    __asm__ __volatile__("movl %%esp, %0" : "=r"(sp));
 #elif defined(__aarch64__)
-    asm("mov %0, sp" : "=r"(sp));
+    __asm__ __volatile__("mov %0, sp" : "=r"(sp));
 #elif defined(__arm__)
-    asm("mov %0, sp" : "=r"(sp));
+    __asm__ __volatile__("mov %0, sp" : "=r"(sp));
 #else
     sp = NULL;
 #endif
