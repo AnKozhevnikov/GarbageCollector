@@ -1,4 +1,5 @@
 #include <mach-o/getsect.h>
+#include <mach-o/dyld.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <libgen.h> 
