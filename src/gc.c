@@ -118,7 +118,14 @@ void *gc_malloc(size_t size)
     alloc->ptr = malloc(size);
     alloc->size = size;
     alloc->active = 1;
+
+    printf("Allocated %zu bytes\n", size);
+    fflush(stdout);
+
     hashmap_insert(&gc->allocations, &alloc->ptr, &alloc);
+
+    printf("Inserted allocation into hashmap\n");
+    fflush(stdout);
 
     if (atomic_fetch_add(&gc->allocation_cnt, 1) > gc->allocation_threshold && !gc->paused)
     {
