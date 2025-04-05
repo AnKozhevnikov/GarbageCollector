@@ -38,9 +38,20 @@ void gc_create()
     sigaddset(&set, SIGUSR1);
     pthread_sigmask(SIG_UNBLOCK, &set, NULL);
 
+    printf("Unblocked SIGUSR1\n");
+    fflush(stdout);
+
     gc = malloc(sizeof(struct GarbageCollector));
+
+    printf("Creating garbage collector\n");
+    fflush(stdout);
+
     gc->allocations = hashmap_create(sizeof(void *), sizeof(void *), hash_for_pointer);
     gc->threads = hashmap_create(sizeof(pthread_t), 0, hash_for_thread);
+
+    printf("Created hashmap for allocations\n");
+    fflush(stdout);
+
     gc->paused = 0;
     gc->allocation_threshold = 1000;
     gc->threads_to_scan = 0;
@@ -48,7 +59,13 @@ void gc_create()
     gc->threads_registring = 0;
     gc->collect_garbage_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
 
+    printf("Initialized mutex\n");
+    fflush(stdout);
+
     gc_register_thread();
+
+    printf("Registered thread\n");
+    fflush(stdout);
 }
 
 void gc_destruct()
