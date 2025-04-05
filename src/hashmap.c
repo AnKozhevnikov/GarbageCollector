@@ -172,6 +172,8 @@ struct Iterator hashmap_begin(const struct HashMap *map)
 {
     pthread_rwlock_rdlock(&map->lock);
 
+    printf("Aquiring lock in hashmap_begin\n");
+
     for (unsigned i = 0; i < map->capacity; i++)
     {
         if (map->used[i] && !map->deleted[i])
