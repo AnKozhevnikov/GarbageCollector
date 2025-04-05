@@ -178,12 +178,16 @@ void *gc_realloc(void *ptr, size_t size)
 
 void gc_free(void *ptr)
 {
+    printf("Freeing pointer %p\n", ptr);
+    fflush(stdout);
     struct Iterator it = hashmap_find(&gc->allocations, &ptr);
     struct Allocation *alloc = *(struct Allocation **)it.value;
     allow_writing(it);
     hashmap_erase(&gc->allocations, &ptr);
     free(alloc->ptr);
     free(alloc);
+    printf("Freed pointer %p\n", ptr);
+    fflush(stdout);
 }
 
 void gc_dfs(struct Allocation *alloc)
