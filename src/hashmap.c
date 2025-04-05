@@ -1,8 +1,8 @@
 #include "hashmap.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 struct HashMap hashmap_create(unsigned key_size, unsigned value_size, unsigned (*hashfunc)(const void *value))
 {
@@ -17,7 +17,11 @@ struct HashMap hashmap_create(unsigned key_size, unsigned value_size, unsigned (
     map.used = calloc(map.capacity, sizeof(int));
     map.deleted = calloc(map.capacity, sizeof(int));
     map.hashfunc = hashfunc;
-    pthread_rwlock_init(&map.lock, 0);
+    int ret = pthread_rwlock_init(&map.lock, NULL);
+    if (ret != 0)
+    {
+        perror("Failed to initialize rwlock\n");
+    }
     return map;
 }
 
