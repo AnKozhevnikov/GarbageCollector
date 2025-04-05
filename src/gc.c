@@ -72,6 +72,8 @@ void gc_create()
 
 void gc_destruct()
 {
+    printf("Destructing garbage collector\n");
+    
     struct Iterator it = hashmap_begin(&gc->allocations);
 
     printf("Acquired iterator\n");
