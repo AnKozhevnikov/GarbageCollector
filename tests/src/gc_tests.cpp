@@ -8,6 +8,9 @@ extern "C"
 TEST(GC, create_destruct)
 {
     gc_create();
+
+    printf("Created garbage collector\n");
+
     gc_destruct();
 }
 
