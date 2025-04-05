@@ -149,7 +149,7 @@ void hashmap_erase(struct HashMap *map, const void *key)
 
 struct Iterator hashmap_find(const struct HashMap *map, const void *key)
 {
-    pthread_rwlock_rdlock(&map->lock);
+    pthread_rwlock_wrlock(&map->lock);
 
     unsigned hash = map->hashfunc(key);
     unsigned i = hash % map->capacity;
@@ -162,20 +162,25 @@ struct Iterator hashmap_find(const struct HashMap *map, const void *key)
             ret.index = i;
             ret.key = map->values + i * (map->key_size + map->value_size);
             ret.value = map->values + i * (map->key_size + map->value_size) + map->key_size;
-            pthread_rwlock_unlock(&map->lock);
+            //pthread_rwlock_unlock(&map->lock);
             return ret;
         }
         i = (i + 1) % map->capacity;
     }
 
-    pthread_rwlock_unlock(&map->lock);
+    //pthread_rwlock_unlock(&map->lock);
 
-    return (struct Iterator){0};
+    struct Iterator ret;
+    ret.map = map;
+    ret.index = 0;
+    ret.key = 0;
+    ret.value = 0;
+    return ret;
 }
 
 struct Iterator hashmap_begin(const struct HashMap *map)
 {
-    pthread_rwlock_rdlock(&map->lock);
+    pthread_rwlock_wrlock(&map->lock);
 
     printf("Aquiring lock in hashmap_begin\n");
 
@@ -188,19 +193,24 @@ struct Iterator hashmap_begin(const struct HashMap *map)
             ret.index = i;
             ret.key = map->values + i * (map->key_size + map->value_size);
             ret.value = map->values + i * (map->key_size + map->value_size) + map->key_size;
-            pthread_rwlock_unlock(&map->lock);
+            //pthread_rwlock_unlock(&map->lock);
             return ret;
         }
     }
 
-    pthread_rwlock_unlock(&map->lock);
+    //pthread_rwlock_unlock(&map->lock);
 
-    return (struct Iterator){0};
+    struct Iterator ret;
+    ret.map = map;
+    ret.index = 0;
+    ret.key = 0;
+    ret.value = 0;
+    return ret;
 }
 
 struct Iterator hashmap_next(struct Iterator it)
 {
-    pthread_rwlock_rdlock(&it.map->lock);
+    //pthread_rwlock_wrlock(&it.map->lock);
 
     for (unsigned i = it.index + 1; i < it.map->capacity; i++)
     {
@@ -211,17 +221,27 @@ struct Iterator hashmap_next(struct Iterator it)
             ret.index = i;
             ret.key = it.map->values + i * (it.map->key_size + it.map->value_size);
             ret.value = it.map->values + i * (it.map->key_size + it.map->value_size) + it.map->key_size;
-            pthread_rwlock_unlock(&it.map->lock);
+            //pthread_rwlock_unlock(&it.map->lock);
             return ret;
         }
     }
 
-    pthread_rwlock_unlock(&it.map->lock);
+    //pthread_rwlock_unlock(&it.map->lock);
 
-    return (struct Iterator){0};
+    struct Iterator ret;
+    ret.map = it.map;
+    ret.index = 0;
+    ret.key = 0;
+    ret.value = 0;
+    return ret;
 }
 
 int hashmap_not_end(struct Iterator it)
 {
-    return it.map != 0;
+    return it.key != 0;
+}
+
+void allow_writing(struct Iterator it)
+{
+    pthread_rwlock_unlock(&it.map->lock);
 }

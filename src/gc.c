@@ -21,6 +21,7 @@ void gc_activate(void *ptr)
 {
     struct Iterator it = hashmap_find(&gc->allocations, &ptr);
     struct Allocation *alloc = *(struct Allocation **)it.value;
+    allow_writing(it);
     alloc->active = 1;
 }
 
@@ -28,6 +29,7 @@ void gc_deactivate(void *ptr)
 {
     struct Iterator it = hashmap_find(&gc->allocations, &ptr);
     struct Allocation *alloc = *(struct Allocation **)it.value;
+    allow_writing(it);
     alloc->active = 0;
 }
 
@@ -73,7 +75,7 @@ void gc_create()
 void gc_destruct()
 {
     printf("Destructing garbage collector\n");
-    
+
     struct Iterator it = hashmap_begin(&gc->allocations);
 
     printf("Acquired iterator\n");
@@ -89,6 +91,7 @@ void gc_destruct()
         free(alloc);
         it = hashmap_next(it);
     }
+    allow_writing(it);
     hashmap_destruct(&gc->allocations);
 
     printf("Freed allocations\n");
@@ -151,6 +154,7 @@ void *gc_realloc(void *ptr, size_t size)
     }
     struct Iterator it = hashmap_find(&gc->allocations, &ptr);
     struct Allocation *alloc = *(struct Allocation **)it.value;
+    allow_writing(it);
     hashmap_erase(&gc->allocations, &ptr);
     alloc->ptr = realloc(alloc->ptr, size);
     alloc->size = size;
@@ -169,6 +173,7 @@ void gc_free(void *ptr)
 {
     struct Iterator it = hashmap_find(&gc->allocations, &ptr);
     struct Allocation *alloc = *(struct Allocation **)it.value;
+    allow_writing(it);
     hashmap_erase(&gc->allocations, &ptr);
     free(alloc->ptr);
     free(alloc);
@@ -190,6 +195,7 @@ void gc_dfs(struct Allocation *alloc)
         {
             struct Iterator it = hashmap_find(&gc->allocations, &ptr);
             struct Allocation *alloc = *(struct Allocation **)it.value;
+            allow_writing(it);
             if (alloc->active && !alloc->root)
             {
                 gc_dfs(alloc);
@@ -216,6 +222,7 @@ void mark_stack()
             {
                 struct Iterator it = hashmap_find(&gc->allocations, &ptr);
                 struct Allocation *alloc = *(struct Allocation **)it.value;
+                allow_writing(it);
                 if (alloc->active)
                 {
                     alloc->root = 1;
@@ -231,6 +238,7 @@ void mark_stack()
             {
                 struct Iterator it = hashmap_find(&gc->allocations, &ptr);
                 struct Allocation *alloc = *(struct Allocation **)it.value;
+                allow_writing(it);
                 if (alloc->active)
                 {
                     alloc->root = 1;
@@ -257,6 +265,7 @@ void mark_sections()
         {
             struct Iterator it = hashmap_find(&gc->allocations, &ptr);
             struct Allocation *alloc = *(struct Allocation **)it.value;
+            allow_writing(it);
             if (alloc->active)
             {
                 alloc->root = 1;
@@ -274,6 +283,7 @@ void mark_sections()
         {
             struct Iterator it = hashmap_find(&gc->allocations, &ptr);
             struct Allocation *alloc = *(struct Allocation **)it.value;
+            allow_writing(it);
             if (alloc->active)
             {
                 alloc->root = 1;
@@ -285,18 +295,30 @@ void mark_sections()
 
 void sweep()
 {
+    struct HashMap to_sweep = hashmap_create(sizeof(void *), sizeof(void *), hash_for_pointer);
     struct Iterator it = hashmap_begin(&gc->allocations);
     while (hashmap_not_end(it))
     {
         struct Allocation *alloc = *(struct Allocation **)it.value;
         if (!alloc->used && alloc->active)
         {
-            hashmap_erase(&gc->allocations, &alloc->ptr);
-            free(alloc->ptr);
-            free(alloc);
+            hashmap_insert(&to_sweep, &alloc->ptr, &alloc);
         }
         it = hashmap_next(it);
     }
+    allow_writing(it);
+
+    it = hashmap_begin(&to_sweep);
+    while (hashmap_not_end(it))
+    {
+        struct Allocation *alloc = *(struct Allocation **)it.value;
+        hashmap_erase(&gc->allocations, &alloc->ptr);
+        free(alloc->ptr);
+        free(alloc);
+        it = hashmap_next(it);
+    }
+    allow_writing(it);
+    hashmap_destruct(&to_sweep);
 }
 
 void collect_garbage()
@@ -311,6 +333,7 @@ void collect_garbage()
         alloc->used = 0;
         it = hashmap_next(it);
     }
+    allow_writing(it);
 
     mark_sections();
 
@@ -341,6 +364,7 @@ void collect_garbage()
         }
         it = hashmap_next(it);
     }
+    allow_writing(it);
 
     while (atomic_load(&gc->threads_to_scan))
     {

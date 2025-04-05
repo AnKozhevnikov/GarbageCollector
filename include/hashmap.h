@@ -39,5 +39,6 @@ struct Iterator hashmap_find(const struct HashMap *map, const void *key);
 struct Iterator hashmap_begin(const struct HashMap *map);
 struct Iterator hashmap_next(struct Iterator it);
 int hashmap_not_end(struct Iterator it);
+void allow_writing(struct Iterator it);
 
 #endif // HASHMAP_H
