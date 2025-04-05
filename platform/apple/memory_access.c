@@ -26,7 +26,7 @@ const struct mach_header_64 *get_own_image_header() {
         if (realpath(image_name, image_real) == NULL) continue;
 
         if (strcmp(real_path, image_real) == 0) {
-            const struct mach_header *header = _dyld_get_image_header(i);
+            const struct mach_header *header = (const struct mach_header_64 *)_dyld_get_image_header(i);
             if (header->magic == MH_MAGIC_64) {
                 return (const struct mach_header_64 *)header;
             }
