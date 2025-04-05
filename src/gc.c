@@ -63,6 +63,8 @@ void gc_destruct()
     }
     hashmap_destruct(&gc->allocations);
     hashmap_destruct(&gc->threads);
+
+    pthread_mutex_destroy(&gc->collect_garbage_mutex);
 }
 
 void *gc_malloc(size_t size)
