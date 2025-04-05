@@ -183,7 +183,11 @@ void gc_free(void *ptr)
     struct Iterator it = hashmap_find(&gc->allocations, &ptr);
     struct Allocation *alloc = *(struct Allocation **)it.value;
     allow_writing(it);
+    printf("Found allocation %p\n", alloc);
+    fflush(stdout);
     hashmap_erase(&gc->allocations, &ptr);
+    printf("Erased allocation from hashmap\n");
+    fflush(stdout);
     free(alloc->ptr);
     free(alloc);
     printf("Freed pointer %p\n", ptr);
