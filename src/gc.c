@@ -34,7 +34,7 @@ void gc_deactivate(void *ptr)
 void gc_create()
 {
     setvbuf(stdout, NULL, _IONBF, 0);
-    
+
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
@@ -75,15 +75,32 @@ void gc_destruct()
     struct Iterator it = hashmap_begin(&gc->allocations);
     while (hashmap_not_end(it))
     {
+        printf("Freeing allocation\n");
+        fflush(stdout);
+
         struct Allocation *alloc = *(struct Allocation **)it.value;
         free(alloc->ptr);
         free(alloc);
         it = hashmap_next(it);
     }
     hashmap_destruct(&gc->allocations);
+
+    printf("Freed allocations\n");
+    fflush(stdout);
+
     hashmap_destruct(&gc->threads);
 
+    printf("Freed threads\n");
+    fflush(stdout);
+
     pthread_mutex_destroy(&gc->collect_garbage_mutex);
+
+    printf("Destroyed mutex\n");
+    fflush(stdout);
+
+    free(gc);
+    gc = NULL;
+    printf("Freed garbage collector\n");
 }
 
 void *gc_malloc(size_t size)
