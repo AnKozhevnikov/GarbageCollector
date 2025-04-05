@@ -23,7 +23,7 @@ jobs:
 
     - name: Test
       working-directory: ${{github.workspace}}/build
-      run: ctest -C ${{env.BUILD_TYPE}}
+      run: cd tests && ctest -C ${{env.BUILD_TYPE}}
 
   build_and_test_macos_intel:
     runs-on: macos-13
@@ -39,7 +39,7 @@ jobs:
 
     - name: Test
       working-directory: ${{github.workspace}}/build
-      run: ctest -C ${{env.BUILD_TYPE}}
+      run: cd tests && ctest -C ${{env.BUILD_TYPE}}
 
   build_and_test_macos_arm:
     runs-on: macos-latest
@@ -55,4 +55,4 @@ jobs:
 
     - name: Test
       working-directory: ${{github.workspace}}/build
-      run: ctest -C ${{env.BUILD_TYPE}}
+      run: cd tests && ctest -C ${{env.BUILD_TYPE}}
