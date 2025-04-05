@@ -1,10 +1,11 @@
 #include "gc.h"
 #include "global.h"
+#include "sched.h"
+#include <pthread.h>
+#include <setjmp.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <setjmp.h>
-#include <pthread.h>
-#include <signal.h>
 
 unsigned hash_for_pointer(const void *value)
 {
@@ -32,14 +33,19 @@ void gc_deactivate(void *ptr)
 
 void gc_create()
 {
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGUSR1);
+    pthread_sigmask(SIG_UNBLOCK, &set, NULL);
+
     gc = malloc(sizeof(struct GarbageCollector));
     gc->allocations = hashmap_create(sizeof(void *), sizeof(void *), hash_for_pointer);
     gc->threads = hashmap_create(sizeof(pthread_t), 0, hash_for_thread);
     gc->paused = 0;
-    gc->bottom = get_stack_base();
     gc->allocation_threshold = 1000;
     gc->threads_to_scan = 0;
     gc->allocation_cnt = 0;
+    gc->threads_registring = 0;
     gc->collect_garbage_mutex = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
 
     gc_register_thread();
@@ -157,8 +163,9 @@ void mark_stack()
     int ret = setjmp(buf);
 
     void *top = get_stack_top();
-    if (top < gc->bottom)
-        for (void *i = top; i < gc->bottom; i += 8)
+    void *bottom = get_stack_base();
+    if (top < bottom)
+        for (void *i = top; i < bottom; i += 8)
         {
             void *ptr = *(void **)i;
             if (hashmap_contains(&gc->allocations, &ptr))
@@ -173,7 +180,7 @@ void mark_stack()
             }
         }
     else
-        for (void *i = gc->bottom; i < top; i += 8)
+        for (void *i = bottom; i < top; i += 8)
         {
             void *ptr = *(void **)i;
             if (hashmap_contains(&gc->allocations, &ptr))
@@ -269,16 +276,24 @@ void collect_garbage()
     {
         mark_stack();
     }
-    
+
     pthread_mutex_lock(&gc_mutex);
 
+    while (atomic_load(&gc->threads_registring) != 0)
+    {
+        sched_yield();
+    }
     it = hashmap_begin(&gc->threads);
     while (hashmap_not_end(it))
     {
         pthread_t thread = *(pthread_t *)it.key;
         if (thread != self)
         {
-            pthread_kill(thread, SIGUSR1);
+            if (pthread_kill(thread, SIGUSR1) != 0)
+            {
+                perror("pthread_kill failed");
+                atomic_fetch_sub(&gc->threads_to_scan, 1);
+            }
         }
         it = hashmap_next(it);
     }
@@ -305,6 +320,8 @@ void gc_signal_handler(int signum)
 
 void gc_register_thread()
 {
+    atomic_fetch_add(&gc->threads_registring, 1);
+
     pthread_t self = pthread_self();
     if (hashmap_contains(&gc->threads, &self))
     {
@@ -313,11 +330,15 @@ void gc_register_thread()
     hashmap_insert(&gc->threads, &self, 0);
 
     struct sigaction sa;
-    sa.sa_handler = gc_signal_handler;
+    sa.sa_handler = &gc_signal_handler;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
+    sa.sa_flags = 0;
 
-    sigaction(SIGUSR1, &sa, NULL);
+    if (sigaction(SIGUSR1, &sa, NULL) == -1)
+    {
+        perror("sigaction failed");
+    }
+    atomic_fetch_sub(&gc->threads_registring, 1);
 }
 
 void gc_unregister_thread()
@@ -328,8 +349,6 @@ void gc_unregister_thread()
         return;
     }
     hashmap_erase(&gc->threads, &self);
-
-    signal(SIGUSR1, SIG_DFL);
 }
 
 void gc_pause()
@@ -340,4 +359,9 @@ void gc_pause()
 void gc_resume()
 {
     gc->paused = 0;
+}
+
+int get_alive_allocations()
+{
+    return gc->allocations.size;
 }

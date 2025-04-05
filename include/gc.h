@@ -28,10 +28,10 @@ struct GarbageCollector
     struct HashMap allocations;
     struct HashMap threads;
     unsigned paused;
-    void *bottom;
 
     atomic_int threads_to_scan;
     atomic_int allocation_cnt;
+    atomic_int threads_registring;
 
     unsigned allocation_threshold;
 
@@ -59,5 +59,7 @@ void collect_garbage();
 
 void gc_pause();
 void gc_resume();
+
+int get_alive_allocations();
 
 #endif // GC_H
