@@ -33,6 +33,8 @@ void gc_deactivate(void *ptr)
 
 void gc_create()
 {
+    setvbuf(stdout, NULL, _IONBF, 0);
+    
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
