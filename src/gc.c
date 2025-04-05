@@ -73,6 +73,10 @@ void gc_create()
 void gc_destruct()
 {
     struct Iterator it = hashmap_begin(&gc->allocations);
+
+    printf("Acquired iterator\n");
+    fflush(stdout);
+
     while (hashmap_not_end(it))
     {
         printf("Freeing allocation\n");
