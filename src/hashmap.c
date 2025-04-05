@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 struct HashMap hashmap_create(unsigned key_size, unsigned value_size, unsigned (*hashfunc)(const void *value))
 {
