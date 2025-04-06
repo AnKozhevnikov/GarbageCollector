@@ -19,28 +19,34 @@ unsigned hash_for_thread(const void *value)
 
 void gc_activate(void *ptr)
 {
-    struct Iterator it = hashmap_find(&gc->allocations, &ptr);
+    struct Iterator it = hashmap_find(gc->allocations, &ptr);
     struct Allocation *alloc = *(struct Allocation **)it.value;
+    allow_writing(it);
     alloc->active = 1;
 }
 
 void gc_deactivate(void *ptr)
 {
-    struct Iterator it = hashmap_find(&gc->allocations, &ptr);
+    struct Iterator it = hashmap_find(gc->allocations, &ptr);
     struct Allocation *alloc = *(struct Allocation **)it.value;
+    allow_writing(it);
     alloc->active = 0;
 }
 
 void gc_create()
 {
+    setvbuf(stdout, NULL, _IONBF, 0);
+
     sigset_t set;
     sigemptyset(&set);
     sigaddset(&set, SIGUSR1);
     pthread_sigmask(SIG_UNBLOCK, &set, NULL);
 
     gc = malloc(sizeof(struct GarbageCollector));
+
     gc->allocations = hashmap_create(sizeof(void *), sizeof(void *), hash_for_pointer);
     gc->threads = hashmap_create(sizeof(pthread_t), 0, hash_for_thread);
+
     gc->paused = 0;
     gc->allocation_threshold = 1000;
     gc->threads_to_scan = 0;
@@ -53,7 +59,8 @@ void gc_create()
 
 void gc_destruct()
 {
-    struct Iterator it = hashmap_begin(&gc->allocations);
+    struct Iterator it = hashmap_begin(gc->allocations);
+
     while (hashmap_not_end(it))
     {
         struct Allocation *alloc = *(struct Allocation **)it.value;
@@ -61,10 +68,15 @@ void gc_destruct()
         free(alloc);
         it = hashmap_next(it);
     }
-    hashmap_destruct(&gc->allocations);
-    hashmap_destruct(&gc->threads);
+    allow_writing(it);
+    hashmap_destruct(gc->allocations);
+
+    hashmap_destruct(gc->threads);
 
     pthread_mutex_destroy(&gc->collect_garbage_mutex);
+
+    free(gc);
+    gc = NULL;
 }
 
 void *gc_malloc(size_t size)
@@ -73,7 +85,8 @@ void *gc_malloc(size_t size)
     alloc->ptr = malloc(size);
     alloc->size = size;
     alloc->active = 1;
-    hashmap_insert(&gc->allocations, &alloc->ptr, &alloc);
+
+    hashmap_insert(gc->allocations, &alloc->ptr, &alloc);
 
     if (atomic_fetch_add(&gc->allocation_cnt, 1) > gc->allocation_threshold && !gc->paused)
     {
@@ -90,7 +103,7 @@ void *gc_calloc(size_t nmemb, size_t size)
     alloc->ptr = calloc(nmemb, size);
     alloc->size = nmemb * size;
     alloc->active = 1;
-    hashmap_insert(&gc->allocations, &alloc->ptr, &alloc);
+    hashmap_insert(gc->allocations, &alloc->ptr, &alloc);
 
     if (atomic_fetch_add(&gc->allocation_cnt, 1) > gc->allocation_threshold && !gc->paused)
     {
@@ -107,12 +120,13 @@ void *gc_realloc(void *ptr, size_t size)
     {
         return gc_malloc(size);
     }
-    struct Iterator it = hashmap_find(&gc->allocations, &ptr);
+    struct Iterator it = hashmap_find(gc->allocations, &ptr);
     struct Allocation *alloc = *(struct Allocation **)it.value;
-    hashmap_erase(&gc->allocations, &ptr);
+    allow_writing(it);
+    hashmap_erase(gc->allocations, &ptr);
     alloc->ptr = realloc(alloc->ptr, size);
     alloc->size = size;
-    hashmap_insert(&gc->allocations, &alloc->ptr, &alloc);
+    hashmap_insert(gc->allocations, &alloc->ptr, &alloc);
 
     if (atomic_fetch_add(&gc->allocation_cnt, 1) > gc->allocation_threshold && !gc->paused)
     {
@@ -125,11 +139,14 @@ void *gc_realloc(void *ptr, size_t size)
 
 void gc_free(void *ptr)
 {
-    struct Iterator it = hashmap_find(&gc->allocations, &ptr);
+    struct Iterator it = hashmap_find(gc->allocations, &ptr);
     struct Allocation *alloc = *(struct Allocation **)it.value;
-    hashmap_erase(&gc->allocations, &ptr);
+    allow_writing(it);
+    hashmap_erase(gc->allocations, &ptr);
+    fflush(stdout);
     free(alloc->ptr);
     free(alloc);
+    fflush(stdout);
 }
 
 void gc_dfs(struct Allocation *alloc)
@@ -144,10 +161,11 @@ void gc_dfs(struct Allocation *alloc)
     for (void *i = start; i < end; i += 8)
     {
         void *ptr = *(void **)i;
-        if (hashmap_contains(&gc->allocations, &ptr))
+        if (hashmap_contains(gc->allocations, &ptr))
         {
-            struct Iterator it = hashmap_find(&gc->allocations, &ptr);
+            struct Iterator it = hashmap_find(gc->allocations, &ptr);
             struct Allocation *alloc = *(struct Allocation **)it.value;
+            allow_writing(it);
             if (alloc->active && !alloc->root)
             {
                 gc_dfs(alloc);
@@ -170,10 +188,11 @@ void mark_stack()
         for (void *i = top; i < bottom; i += 8)
         {
             void *ptr = *(void **)i;
-            if (hashmap_contains(&gc->allocations, &ptr))
+            if (hashmap_contains(gc->allocations, &ptr))
             {
-                struct Iterator it = hashmap_find(&gc->allocations, &ptr);
+                struct Iterator it = hashmap_find(gc->allocations, &ptr);
                 struct Allocation *alloc = *(struct Allocation **)it.value;
+                allow_writing(it);
                 if (alloc->active)
                 {
                     alloc->root = 1;
@@ -185,10 +204,11 @@ void mark_stack()
         for (void *i = bottom; i < top; i += 8)
         {
             void *ptr = *(void **)i;
-            if (hashmap_contains(&gc->allocations, &ptr))
+            if (hashmap_contains(gc->allocations, &ptr))
             {
-                struct Iterator it = hashmap_find(&gc->allocations, &ptr);
+                struct Iterator it = hashmap_find(gc->allocations, &ptr);
                 struct Allocation *alloc = *(struct Allocation **)it.value;
+                allow_writing(it);
                 if (alloc->active)
                 {
                     alloc->root = 1;
@@ -211,10 +231,11 @@ void mark_sections()
     for (void *i = top; i < bottom; i += 8)
     {
         void *ptr = *(void **)i;
-        if (hashmap_contains(&gc->allocations, &ptr))
+        if (hashmap_contains(gc->allocations, &ptr))
         {
-            struct Iterator it = hashmap_find(&gc->allocations, &ptr);
+            struct Iterator it = hashmap_find(gc->allocations, &ptr);
             struct Allocation *alloc = *(struct Allocation **)it.value;
+            allow_writing(it);
             if (alloc->active)
             {
                 alloc->root = 1;
@@ -228,10 +249,11 @@ void mark_sections()
     for (void *i = top; i < bottom; i += 8)
     {
         void *ptr = *(void **)i;
-        if (hashmap_contains(&gc->allocations, &ptr))
+        if (hashmap_contains(gc->allocations, &ptr))
         {
-            struct Iterator it = hashmap_find(&gc->allocations, &ptr);
+            struct Iterator it = hashmap_find(gc->allocations, &ptr);
             struct Allocation *alloc = *(struct Allocation **)it.value;
+            allow_writing(it);
             if (alloc->active)
             {
                 alloc->root = 1;
@@ -243,25 +265,37 @@ void mark_sections()
 
 void sweep()
 {
-    struct Iterator it = hashmap_begin(&gc->allocations);
+    struct HashMap *to_sweep = hashmap_create(sizeof(void *), sizeof(void *), hash_for_pointer);
+    struct Iterator it = hashmap_begin(gc->allocations);
     while (hashmap_not_end(it))
     {
         struct Allocation *alloc = *(struct Allocation **)it.value;
         if (!alloc->used && alloc->active)
         {
-            hashmap_erase(&gc->allocations, &alloc->ptr);
-            free(alloc->ptr);
-            free(alloc);
+            hashmap_insert(to_sweep, &alloc->ptr, &alloc);
         }
         it = hashmap_next(it);
     }
+    allow_writing(it);
+
+    it = hashmap_begin(to_sweep);
+    while (hashmap_not_end(it))
+    {
+        struct Allocation *alloc = *(struct Allocation **)it.value;
+        hashmap_erase(gc->allocations, &alloc->ptr);
+        free(alloc->ptr);
+        free(alloc);
+        it = hashmap_next(it);
+    }
+    allow_writing(it);
+    hashmap_destruct(to_sweep);
 }
 
 void collect_garbage()
 {
     pthread_mutex_lock(&gc->collect_garbage_mutex);
 
-    struct Iterator it = hashmap_begin(&gc->allocations);
+    struct Iterator it = hashmap_begin(gc->allocations);
     while (hashmap_not_end(it))
     {
         struct Allocation *alloc = *(struct Allocation **)it.value;
@@ -269,12 +303,13 @@ void collect_garbage()
         alloc->used = 0;
         it = hashmap_next(it);
     }
+    allow_writing(it);
 
     mark_sections();
 
     pthread_t self = pthread_self();
-    atomic_store(&gc->threads_to_scan, gc->threads.size);
-    if (hashmap_contains(&gc->threads, &self))
+    atomic_store(&gc->threads_to_scan, gc->threads->size);
+    if (hashmap_contains(gc->threads, &self))
     {
         mark_stack();
     }
@@ -285,7 +320,7 @@ void collect_garbage()
     {
         sched_yield();
     }
-    it = hashmap_begin(&gc->threads);
+    it = hashmap_begin(gc->threads);
     while (hashmap_not_end(it))
     {
         pthread_t thread = *(pthread_t *)it.key;
@@ -299,6 +334,7 @@ void collect_garbage()
         }
         it = hashmap_next(it);
     }
+    allow_writing(it);
 
     while (atomic_load(&gc->threads_to_scan))
     {
@@ -325,11 +361,11 @@ void gc_register_thread()
     atomic_fetch_add(&gc->threads_registring, 1);
 
     pthread_t self = pthread_self();
-    if (hashmap_contains(&gc->threads, &self))
+    if (hashmap_contains(gc->threads, &self))
     {
         return;
     }
-    hashmap_insert(&gc->threads, &self, 0);
+    hashmap_insert(gc->threads, &self, 0);
 
     struct sigaction sa;
     sa.sa_handler = &gc_signal_handler;
@@ -346,11 +382,11 @@ void gc_register_thread()
 void gc_unregister_thread()
 {
     pthread_t self = pthread_self();
-    if (!hashmap_contains(&gc->threads, &self))
+    if (!hashmap_contains(gc->threads, &self))
     {
         return;
     }
-    hashmap_erase(&gc->threads, &self);
+    hashmap_erase(gc->threads, &self);
 }
 
 void gc_pause()
@@ -365,5 +401,5 @@ void gc_resume()
 
 int get_alive_allocations()
 {
-    return gc->allocations.size;
+    return gc->allocations->size;
 }

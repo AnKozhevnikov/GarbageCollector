@@ -25,8 +25,8 @@ struct Allocation
 
 struct GarbageCollector
 {
-    struct HashMap allocations;
-    struct HashMap threads;
+    struct HashMap *allocations;
+    struct HashMap *threads;
     unsigned paused;
 
     atomic_int threads_to_scan;
