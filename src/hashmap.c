@@ -3,19 +3,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "safe_functions.h"
 
 struct HashMap *hashmap_create(unsigned key_size, unsigned value_size, unsigned (*hashfunc)(const void *value))
 {
-    struct HashMap *map = malloc(sizeof(struct HashMap));
+    struct HashMap *map = safe_malloc(sizeof(struct HashMap));
     map->size = 0;
     map->deleted_cnt = 0;
     map->capacity = 8;
     map->max_load_factor = 0.75;
     map->key_size = key_size;
     map->value_size = value_size;
-    map->values = malloc(map->capacity * (key_size + value_size));
-    map->used = calloc(map->capacity, sizeof(int));
-    map->deleted = calloc(map->capacity, sizeof(int));
+    map->values = safe_malloc(map->capacity * (key_size + value_size));
+    map->used = safe_calloc(map->capacity, sizeof(int));
+    map->deleted = safe_calloc(map->capacity, sizeof(int));
     map->hashfunc = hashfunc;
     int ret = pthread_rwlock_init(&map->lock, NULL);
     if (ret != 0)
@@ -61,9 +62,9 @@ void hashmap_rebuild(struct HashMap *map, unsigned new_capacity)
     unsigned old_capacity = map->capacity;
 
     map->capacity = new_capacity;
-    map->values = malloc(map->capacity * (map->key_size + map->value_size));
-    map->used = calloc(map->capacity, sizeof(int));
-    map->deleted = calloc(map->capacity, sizeof(int));
+    map->values = safe_malloc(map->capacity * (map->key_size + map->value_size));
+    map->used = safe_calloc(map->capacity, sizeof(int));
+    map->deleted = safe_calloc(map->capacity, sizeof(int));
     map->size = 0;
     map->deleted_cnt = 0;
 

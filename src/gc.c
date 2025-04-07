@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include "safe_functions.h"
 
 unsigned hash_for_pointer(const void *value)
 {
@@ -20,6 +21,11 @@ unsigned hash_for_thread(const void *value)
 void gc_activate(void *ptr)
 {
     struct Iterator it = hashmap_find(gc->allocations, &ptr);
+    if (it.value == NULL)
+    {
+        perror("gc_activate: pointer not found");
+        return;
+    }
     struct Allocation *alloc = *(struct Allocation **)it.value;
     allow_writing(it);
     alloc->active = 1;
@@ -28,6 +34,11 @@ void gc_activate(void *ptr)
 void gc_deactivate(void *ptr)
 {
     struct Iterator it = hashmap_find(gc->allocations, &ptr);
+    if (it.value == NULL)
+    {
+        perror("gc_deactivate: pointer not found");
+        return;
+    }
     struct Allocation *alloc = *(struct Allocation **)it.value;
     allow_writing(it);
     alloc->active = 0;
@@ -42,7 +53,7 @@ void gc_create()
     sigaddset(&set, SIGUSR1);
     pthread_sigmask(SIG_UNBLOCK, &set, NULL);
 
-    gc = malloc(sizeof(struct GarbageCollector));
+    gc = safe_malloc(sizeof(struct GarbageCollector));
 
     gc->allocations = hashmap_create(sizeof(void *), sizeof(void *), hash_for_pointer);
     gc->threads = hashmap_create(sizeof(pthread_t), 0, hash_for_thread);
@@ -82,7 +93,28 @@ void gc_destruct()
 void *gc_malloc(size_t size)
 {
     struct Allocation *alloc = malloc(sizeof(struct Allocation));
+    if (alloc == NULL)
+    {
+        collect_garbage();
+        alloc = malloc(sizeof(struct Allocation));
+        if (alloc == NULL)
+        {
+            perror("gc_malloc: out of memory");
+            return NULL;
+        }
+    }
     alloc->ptr = malloc(size);
+    if (alloc->ptr == NULL)
+    {
+        collect_garbage();
+        alloc->ptr = malloc(size);
+        if (alloc->ptr == NULL)
+        {
+            perror("gc_malloc: out of memory");
+            free(alloc);
+            return NULL;
+        }
+    }
     alloc->size = size;
     alloc->active = 1;
 
@@ -100,7 +132,29 @@ void *gc_malloc(size_t size)
 void *gc_calloc(size_t nmemb, size_t size)
 {
     struct Allocation *alloc = malloc(sizeof(struct Allocation));
+    if (alloc == NULL)
+    {
+        collect_garbage();
+        alloc = malloc(sizeof(struct Allocation));
+        if (alloc == NULL)
+        {
+            perror("gc_calloc: out of memory");
+            return NULL;
+        }
+    }
     alloc->ptr = calloc(nmemb, size);
+    if (alloc->ptr == NULL)
+    {
+        collect_garbage();
+        alloc->ptr = calloc(nmemb, size);
+        if (alloc->ptr == NULL)
+        {
+            perror("gc_calloc: out of memory");
+            free(alloc);
+            return NULL;
+        }
+    }
+
     alloc->size = nmemb * size;
     alloc->active = 1;
     hashmap_insert(gc->allocations, &alloc->ptr, &alloc);
@@ -121,10 +175,26 @@ void *gc_realloc(void *ptr, size_t size)
         return gc_malloc(size);
     }
     struct Iterator it = hashmap_find(gc->allocations, &ptr);
+    if (it.value == NULL)
+    {
+        perror("gc_realloc: pointer not found");
+        return NULL;
+    }
     struct Allocation *alloc = *(struct Allocation **)it.value;
     allow_writing(it);
     hashmap_erase(gc->allocations, &ptr);
     alloc->ptr = realloc(alloc->ptr, size);
+    if (alloc->ptr == NULL)
+    {
+        collect_garbage();
+        alloc->ptr = realloc(alloc->ptr, size);
+        if (alloc->ptr == NULL)
+        {
+            perror("gc_realloc: out of memory");
+            free(alloc);
+            return NULL;
+        }
+    }
     alloc->size = size;
     hashmap_insert(gc->allocations, &alloc->ptr, &alloc);
 
@@ -140,6 +210,11 @@ void *gc_realloc(void *ptr, size_t size)
 void gc_free(void *ptr)
 {
     struct Iterator it = hashmap_find(gc->allocations, &ptr);
+    if (it.value == NULL)
+    {
+        perror("gc_free: pointer not found");
+        return;
+    }
     struct Allocation *alloc = *(struct Allocation **)it.value;
     allow_writing(it);
     hashmap_erase(gc->allocations, &ptr);
