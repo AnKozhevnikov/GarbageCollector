@@ -15,8 +15,6 @@ if(APPLE)
 elseif(UNIX AND NOT APPLE)
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         file(GLOB_RECURSE PLATFORM_SOURCES "platform/linux/*.c")
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD" OR CMAKE_SYSTEM_NAME STREQUAL "OpenBSD" OR CMAKE_SYSTEM_NAME STREQUAL "NetBSD")
-        file(GLOB_RECURSE PLATFORM_SOURCES "platform/bsd/*.c")
     endif()
 endif()
 
