@@ -146,11 +146,7 @@ void *func1(void *arg)
     ready1 = 1;
     printf("func1 ready and waiting for signal\n");
 
-    // big work
-    for (int i = 0; i < 1000000000; i++)
-    {
-        int x = i * i;
-    }
+    pause();
 
     gc_unregister_thread();
 
@@ -171,11 +167,7 @@ void *func2(void *arg)
     ready2 = 1;
     printf("func2 ready and waiting for signal\n");
 
-    // big work
-    for (int i = 0; i < 1000000000; i++)
-    {
-        int x = i * i;
-    }
+    pause();
 
     gc_unregister_thread();
 

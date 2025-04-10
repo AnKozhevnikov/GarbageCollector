@@ -1,12 +1,12 @@
 #include "gc.h"
 #include "global.h"
+#include "safe_functions.h"
 #include "sched.h"
 #include <pthread.h>
 #include <setjmp.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include "safe_functions.h"
 
 unsigned hash_for_pointer(const void *value)
 {
@@ -122,6 +122,9 @@ void *gc_malloc(size_t size)
 
     if (atomic_fetch_add(&gc->allocation_cnt, 1) > gc->allocation_threshold && !gc->paused)
     {
+        // this pointer can be destroyed, because it is not used anywhere yet, so we put it in stack
+        void *last_alloc = alloc->ptr;
+        
         collect_garbage();
         atomic_store(&gc->allocation_cnt, 0);
     }
@@ -161,6 +164,9 @@ void *gc_calloc(size_t nmemb, size_t size)
 
     if (atomic_fetch_add(&gc->allocation_cnt, 1) > gc->allocation_threshold && !gc->paused)
     {
+        // this pointer can be destroyed, because it is not used anywhere yet, so we put it in stack
+        void *last_alloc = alloc->ptr;
+
         collect_garbage();
         atomic_store(&gc->allocation_cnt, 0);
     }
@@ -200,6 +206,9 @@ void *gc_realloc(void *ptr, size_t size)
 
     if (atomic_fetch_add(&gc->allocation_cnt, 1) > gc->allocation_threshold && !gc->paused)
     {
+        // this pointer can be destroyed, because it is not used anywhere yet, so we put it in stack
+        void *last_alloc = alloc->ptr;
+
         collect_garbage();
         atomic_store(&gc->allocation_cnt, 0);
     }
@@ -260,7 +269,7 @@ void mark_stack()
     void *top = get_stack_top();
     void *bottom = get_stack_base();
     if (top < bottom)
-        for (void *i = top; i < bottom; i += 8)
+        for (void *i = top; i <= bottom - sizeof(void *); i += 1)
         {
             void *ptr = *(void **)i;
             if (hashmap_contains(gc->allocations, &ptr))
@@ -276,7 +285,7 @@ void mark_stack()
             }
         }
     else
-        for (void *i = bottom; i < top; i += 8)
+        for (void *i = bottom; i <= top - sizeof(void *); i += 1)
         {
             void *ptr = *(void **)i;
             if (hashmap_contains(gc->allocations, &ptr))
@@ -303,7 +312,7 @@ void mark_sections()
 {
     void *top = get_data_start();
     void *bottom = get_data_end();
-    for (void *i = top; i < bottom; i += 8)
+    for (void *i = top; i <= bottom - sizeof(void *); i += 1)
     {
         void *ptr = *(void **)i;
         if (hashmap_contains(gc->allocations, &ptr))
@@ -321,7 +330,7 @@ void mark_sections()
 
     top = get_bss_start();
     bottom = get_bss_end();
-    for (void *i = top; i < bottom; i += 8)
+    for (void *i = top; i <= bottom - sizeof(void *); i += 1)
     {
         void *ptr = *(void **)i;
         if (hashmap_contains(gc->allocations, &ptr))
@@ -477,4 +486,9 @@ void gc_resume()
 int get_alive_allocations()
 {
     return gc->allocations->size;
+}
+
+void set_allocation_threshold(unsigned threshold)
+{
+    gc->allocation_threshold = threshold;
 }

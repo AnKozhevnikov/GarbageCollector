@@ -62,4 +62,6 @@ void gc_resume();
 
 int get_alive_allocations();
 
+void set_allocation_threshold(unsigned threshold);
+
 #endif // GC_H
